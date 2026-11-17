@@ -16,7 +16,7 @@ A Telegram Mini App starter for a CS2 skin collection platform. The development 
 
 Requirements: Docker Compose v2.
 
-1. Copy `.env.example` to `.env`. Set a long random `SECRET_KEY`, a unique `ADMIN_PASSWORD`, and your Telegram bot token/username. Keep `STEAM_DELIVERY_ENABLED=false` until an authorized delivery provider is implemented and reviewed.
+1. Copy `.env.example` to `.env`. Set a strong `POSTGRES_PASSWORD`, a long random `SECRET_KEY`, a unique `ADMIN_PASSWORD`, and your Telegram bot token/username. Keep `STEAM_DELIVERY_ENABLED=false` until an authorized delivery provider is implemented and reviewed. Never commit `.env`.
 2. Set `WEBAPP_URL` to the public HTTPS address where the Mini App will be hosted. Telegram requires HTTPS for production Mini Apps.
 3. Start the API, PostgreSQL, and web application:
 
@@ -79,16 +79,33 @@ deployment and needs a separate worker host if you use it.
    ```
 
    Run this from the repository root in an environment where `DATABASE_URL`
-   points to the hosted database. Keep that value private.
-3. In the frontend Vercel project, keep **Root Directory** at the repository
+   points to the hosted database. In PowerShell, enter the URL without putting
+   it in shell history or the command line:
+
+   ```powershell
+   $env:DATABASE_URL = Read-Host "Pooled Neon URL (use postgresql+psycopg:// scheme)"
+   .\.venv\Scripts\python.exe -m alembic -c backend\alembic.ini upgrade head
+   Remove-Item Env:DATABASE_URL
+   ```
+
+   The backend normalizes `postgres://` and `postgresql://` to
+   `postgresql+psycopg://` automatically. Keep the value private.
+3. In the **backend Vercel project**, open **Settings → Environment Variables**,
+   choose **Add New**, set **Key** to `DATABASE_URL`, and paste Neon’s pooled
+   connection string as the **Value**. Change only the URL scheme to
+   `postgresql+psycopg://`; preserve its credentials and query parameters.
+   Select the **Production** environment and save, then redeploy the backend.
+   Do not put this value in chat, source code, or a frontend environment variable.
+4. In the frontend Vercel project, keep **Root Directory** at the repository
    root (`.`) and add `VITE_API_BASE_URL` with the HTTPS origin Vercel generated
    for the backend project, without a trailing slash or `/api`. Vite embeds
    this value at build time, so redeploy the frontend after adding or changing it.
-4. Verify the deployed backend by requesting its generated HTTPS origin plus
-   `/api/health`; it should return JSON with `"status":"ok"`. Then open the
-   Telegram Mini App. Player sessions are created only by
-   `POST /api/auth/telegram` with Telegram's signed `initData`; authentication
-   is not simulated in production.
+5. Verify the deployed backend by requesting its generated HTTPS origin plus
+   `/api/health`; a healthy database returns JSON with `"status":"ok"`. If the
+   database is unreachable, the endpoint responds `503` without exposing
+   connection details. Then open the Telegram Mini App. Player sessions are
+   created only by `POST /api/auth/telegram` with Telegram's signed `initData`;
+   authentication is not simulated in production.
 
 The backend's `FRONTEND_ORIGIN` allowlist must include the exact production
 frontend domain. Add a preview domain only if it is needed. The frontend calls

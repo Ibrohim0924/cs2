@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: cs2bot
       POSTGRES_USER: cs2
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cs2-local-only}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -18,7 +18,7 @@ services:
       dockerfile: Dockerfile
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://cs2:${POSTGRES_PASSWORD:-cs2-local-only}@db:5432/cs2bot
+      DATABASE_URL: postgresql+psycopg://cs2:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/cs2bot
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:8080}
     depends_on:
       db:
@@ -40,7 +40,7 @@ services:
     command: ["python", "backend/bot.py"]
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://cs2:${POSTGRES_PASSWORD:-cs2-local-only}@db:5432/cs2bot
+      DATABASE_URL: postgresql+psycopg://cs2:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/cs2bot
     depends_on:
       db:
         condition: service_healthy

@@ -38,6 +38,8 @@ async def rate_limit(request: Request, call_next):
 @app.on_event("startup")
 def startup() -> None:
     if settings.app_env == "production":
+        if not settings.database_url.startswith("postgresql+psycopg://"):
+            raise RuntimeError("Set DATABASE_URL to a PostgreSQL connection string before production startup")
         if settings.secret_key == "development-only-replace-before-deploy" or len(settings.secret_key) < 32:
             raise RuntimeError("Set a SECRET_KEY of at least 32 characters before production startup")
         if not settings.telegram_bot_token:

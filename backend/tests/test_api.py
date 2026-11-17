@@ -3,12 +3,14 @@ import hashlib
 import hmac
 import json
 import time
+from unittest.mock import Mock
 from urllib.parse import urlencode
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -115,6 +117,37 @@ def test_frontend_origin_accepts_production_and_preview_domains() -> None:
         "https://cs2.example.vercel.app",
         "https://cs2.example.com",
     ]
+
+
+@pytest.mark.parametrize(
+    ("database_url", "expected"),
+    [
+        ("postgres://db.example/neon?sslmode=require",
+         "postgresql+psycopg://db.example/neon?sslmode=require"),
+        ("postgresql://db.example/neon?sslmode=require",
+         "postgresql+psycopg://db.example/neon?sslmode=require"),
+        ("postgresql+psycopg://db.example/neon?sslmode=require",
+         "postgresql+psycopg://db.example/neon?sslmode=require"),
+    ],
+)
+def test_database_url_uses_psycopg_driver(database_url: str, expected: str) -> None:
+    assert Settings(database_url=database_url).database_url == expected
+
+
+def test_health_checks_database_connectivity(client: TestClient) -> None:
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
+def test_health_reports_database_unavailable_without_leaking_details(client: TestClient) -> None:
+    unavailable_db = Mock()
+    unavailable_db.execute.side_effect = SQLAlchemyError("private connection details")
+    client.app.dependency_overrides[get_db] = lambda: unavailable_db
+
+    response = client.get("/api/health")
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Database unavailable"}
 
 
 def test_telegram_auth_endpoint_creates_a_player_session(

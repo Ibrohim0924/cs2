@@ -3,8 +3,8 @@ import re
 from urllib.parse import parse_qs, parse_qsl, urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -53,7 +53,11 @@ def _upsert_user(db: Session, telegram_user: dict, referral_code: str | None = N
 
 
 @router.get("/health")
-def health() -> dict:
+def health(db: Session = Depends(get_db)) -> dict:
+    try:
+        db.execute(text("SELECT 1"))
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Database unavailable") from exc
     return {"status": "ok", "delivery_enabled": steam_delivery_provider.enabled}
 
 
