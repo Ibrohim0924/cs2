@@ -21,7 +21,10 @@ from app.seed import seed_data
 
 
 @pytest.fixture
-def client() -> Generator[TestClient, None, None]:
+def client(monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]:
+    monkeypatch.setattr(settings, "app_env", "development")
+    monkeypatch.setattr(settings, "admin_username", "admin")
+    monkeypatch.setattr(settings, "admin_password", "change-this-before-use")
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},

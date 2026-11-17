@@ -45,8 +45,17 @@ FastAPI backend are built with their own runtimes:
   selects Vite and publishes `frontend/dist`.
 - **Backend project:** create a second Vercel project from the same repository
   and set Root Directory to `backend/`. Vercel finds the FastAPI application
-  at `app/main.py`, installs `requirements.txt` from that root, and selects
-  Python 3.12 from `.python-version` in that root.
+  at `app/main.py` via `pyproject.toml`, installs `requirements.txt` from that
+  root, and selects Python 3.12 from `.python-version` in that root.
+
+For the backend Vercel project, the **Root Directory must be `backend`**,
+Framework Preset must be **FastAPI**, and custom Install Command, Build Command,
+and Output Directory overrides must be cleared so Vercel can use Python's
+FastAPI runtime. The root `vercel.json` and `package.json` belong to the separate
+Vite frontend. If backend build logs show `npm ci`, `tsc -b`, or `vite build`,
+the deployment is still using the frontend project root or frontend build
+overrides; changing Python application code cannot override those dashboard
+settings.
 
 For a free hobby deployment, use [Vercel Hobby](https://vercel.com/pricing) for
 the HTTP API ([FastAPI deployment guide](https://vercel.com/docs/frameworks/backend/fastapi))
