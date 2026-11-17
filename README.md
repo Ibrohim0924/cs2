@@ -34,6 +34,29 @@ Requirements: Docker Compose v2.
 
 The Compose stack runs the Alembic migration before starting the API and seeds clearly marked catalog entries. The default local Postgres password is for development only.
 
+## Deploying on Vercel
+
+Use two Vercel projects connected to this repository so the static frontend and
+FastAPI backend are built with their own runtimes:
+
+- **Frontend project:** set Root Directory to the repository root (`.`), not
+  `frontend/`. The npm manifests and build script are at the repository root;
+  Vite itself uses `frontend/` as its source root. `vercel.json` explicitly
+  selects Vite and publishes `frontend/dist`.
+- **Backend project:** set Root Directory to `backend/`. Vercel finds the
+  FastAPI application at `app/main.py`, installs `backend/requirements.txt`,
+  and selects Python 3.12 from `backend/.python-version`.
+
+Set `VITE_API_URL` in the frontend project's Vercel environment variables to
+the backend deployment's HTTPS origin. Set the backend's required environment
+variables (`APP_ENV=production`, `DATABASE_URL`, `SECRET_KEY`,
+`TELEGRAM_BOT_TOKEN`, `ADMIN_PASSWORD`, and `FRONTEND_ORIGIN`) in the backend
+project's Vercel settings. Add any other values needed from `.env.example`
+there as well. Do not commit `.env` or put server secrets in frontend variables.
+
+The root `requirements.txt` includes `backend/requirements.txt`, keeping local
+and Docker installs aligned with the backend's Vercel dependency manifest.
+
 ## Local development (without Docker)
 
 1. Create a virtual environment and install Python dependencies:
