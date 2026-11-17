@@ -43,16 +43,60 @@ FastAPI backend are built with their own runtimes:
   `frontend/`. The npm manifests and build script are at the repository root;
   Vite itself uses `frontend/` as its source root. `vercel.json` explicitly
   selects Vite and publishes `frontend/dist`.
-- **Backend project:** set Root Directory to `backend/`. Vercel finds the
-  FastAPI application at `app/main.py`, installs `backend/requirements.txt`,
-  and selects Python 3.12 from `backend/.python-version`.
+- **Backend project:** create a second Vercel project from the same repository
+  and set Root Directory to `backend/`. Vercel finds the FastAPI application
+  at `app/main.py`, installs `requirements.txt` from that root, and selects
+  Python 3.12 from `.python-version` in that root.
 
-Set `VITE_API_URL` in the frontend project's Vercel environment variables to
-the backend deployment's HTTPS origin. Set the backend's required environment
-variables (`APP_ENV=production`, `DATABASE_URL`, `SECRET_KEY`,
-`TELEGRAM_BOT_TOKEN`, `ADMIN_PASSWORD`, and `FRONTEND_ORIGIN`) in the backend
-project's Vercel settings. Add any other values needed from `.env.example`
-there as well. Do not commit `.env` or put server secrets in frontend variables.
+For a free hobby deployment, use [Vercel Hobby](https://vercel.com/pricing) for
+the HTTP API ([FastAPI deployment guide](https://vercel.com/docs/frameworks/backend/fastapi))
+and a hosted PostgreSQL provider such as [Neon Free](https://neon.com/pricing).
+Neon's free database can scale to zero after inactivity, so the first database
+request may be slower. Vercel Functions are request-driven; the optional
+long-running `backend/bot.py` polling process is not kept alive by this API
+deployment and needs a separate worker host if you use it.
+
+1. Deploy the backend first. In the new Vercel project select **Root Directory**
+   `backend/` (do not use the frontend root `vercel.json` or `frontend/`).
+   Add these backend environment variables in its Vercel Project Settings:
+   `APP_ENV=production`, `DATABASE_URL`, `SECRET_KEY`, `TELEGRAM_BOT_TOKEN`,
+   `ADMIN_PASSWORD`, `ADMIN_USERNAME`, and `FRONTEND_ORIGIN`. Use a hosted
+   PostgreSQL database for `DATABASE_URL`; SQLite storage on a Vercel function
+   is not persistent. Add `WEBAPP_URL` and `TELEGRAM_BOT_USERNAME` if the bot
+   uses them. Set `FRONTEND_ORIGIN` to
+   `https://cs2-khm3x42v6-ibo-fb74.vercel.app` (no trailing slash). Separate
+   additional exact allowed origins with commas; do not use a wildcard.
+   For Neon, use its pooled connection URL for serverless access and change the
+   scheme to `postgresql+psycopg://` while retaining the host, credentials,
+   database, and `sslmode=require` query parameter.
+2. Before the backend handles requests, apply its database migrations using
+   the same `DATABASE_URL`:
+
+   ```powershell
+   py -3.12 -m venv .venv
+   .\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+   .\.venv\Scripts\python.exe -m alembic -c backend\alembic.ini upgrade head
+   ```
+
+   Run this from the repository root in an environment where `DATABASE_URL`
+   points to the hosted database. Keep that value private.
+3. In the frontend Vercel project, keep **Root Directory** at the repository
+   root (`.`) and add `VITE_API_BASE_URL` with the HTTPS origin Vercel generated
+   for the backend project, without a trailing slash or `/api`. Vite embeds
+   this value at build time, so redeploy the frontend after adding or changing it.
+4. Verify the deployed backend by requesting its generated HTTPS origin plus
+   `/api/health`; it should return JSON with `"status":"ok"`. Then open the
+   Telegram Mini App. Player sessions are created only by
+   `POST /api/auth/telegram` with Telegram's signed `initData`; authentication
+   is not simulated in production.
+
+The backend's `FRONTEND_ORIGIN` allowlist must include the exact production
+frontend domain. Add a preview domain only if it is needed. The frontend calls
+`POST /api/auth/telegram` at `VITE_API_BASE_URL`; if that URL is missing or points
+to the frontend project, the app displays a specific configuration/connection
+error. `frontend/.env.example` documents the local frontend API URL.
+
+Do not commit `.env` or put server secrets in frontend variables.
 
 The root `requirements.txt` includes `backend/requirements.txt`, keeping local
 and Docker installs aligned with the backend's Vercel dependency manifest.

@@ -1,4 +1,9 @@
 from collections.abc import Generator
+import hashlib
+import hmac
+import json
+import time
+from urllib.parse import urlencode
 
 import pytest
 from fastapi import FastAPI
@@ -8,6 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.api import router
+from app.core.config import Settings, settings
 from app.core.database import Base, get_db
 from app.seed import seed_data
 
@@ -100,3 +106,37 @@ def test_admin_role_is_required_for_admin_data(client: TestClient) -> None:
     admin_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
     assert client.get("/api/admin/overview", headers=admin_headers).status_code == 200
     assert client.get("/api/admin/withdrawals", headers=admin_headers).status_code == 200
+
+
+def test_frontend_origin_accepts_production_and_preview_domains() -> None:
+    config = Settings(frontend_origin="http://localhost:5173, https://cs2.example.vercel.app/,https://cs2.example.com")
+    assert config.cors_origins == [
+        "http://localhost:5173",
+        "https://cs2.example.vercel.app",
+        "https://cs2.example.com",
+    ]
+
+
+def test_telegram_auth_endpoint_creates_a_player_session(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    health = client.get("/api/health")
+    assert health.status_code == 200
+    assert health.json()["status"] == "ok"
+
+    bot_token = "test-bot-token"
+    monkeypatch.setattr(settings, "telegram_bot_token", bot_token)
+    fields = {
+        "auth_date": str(int(time.time())),
+        "query_id": "test-query",
+        "user": json.dumps({"id": 12345, "first_name": "Test"}),
+    }
+    data_check_string = "\n".join(f"{key}={value}" for key, value in sorted(fields.items()))
+    secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+    fields["hash"] = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+
+    response = client.post("/api/auth/telegram", json={"init_data": urlencode(fields)})
+    assert response.status_code == 200
+    access_token = response.json()["access_token"]
+    assert client.get("/api/me", headers={"Authorization": f"Bearer {access_token}"}).json()["telegram_id"] == 12345

@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 90
     steam_delivery_enabled: bool = False
 
+    @property
+    def cors_origins(self) -> list[str]:
+        return [origin.strip().rstrip("/") for origin in self.frontend_origin.split(",") if origin.strip()]
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 

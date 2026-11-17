@@ -14,6 +14,7 @@ type Notice = { tone: "success" | "error"; text: string };
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [tokenReady, setTokenReady] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
@@ -45,18 +46,20 @@ function App() {
             method: "POST", body: JSON.stringify({ username: "demo_player" }),
           });
           setToken(result.access_token);
+        } else if (!getToken()) {
+          setAuthError("Open this Mini App through Telegram to create a player session.");
         }
         if (getToken()) await refreshUser();
       } catch (error) {
         clearToken();
-        if (active) notify("error", error instanceof Error ? error.message : "Could not connect to the service");
+        if (active) setAuthError(error instanceof Error ? error.message : "Could not connect to the service.");
       } finally {
         if (active) setTokenReady(true);
       }
     }
     void authenticate();
     return () => { active = false; };
-  }, [notify, refreshUser]);
+  }, [refreshUser]);
 
   const shellVisible = !location.pathname.startsWith("/admin");
   const handleLogout = () => { clearToken(); setUser(null); setTokenReady(false); navigate("/"); window.location.reload(); };
@@ -64,7 +67,7 @@ function App() {
 
   if (!tokenReady) return <LoadingScreen />;
   if (!user && !location.pathname.startsWith("/admin")) {
-    return <main className="connection-screen"><div className="brand-mark"><Crosshair size={24} /></div><h1>CS2 OPEN CASE BOT</h1><p>Open the Mini App through Telegram to continue.</p><div className="notice error">Could not establish a player session. Check that the backend is running.</div></main>;
+    return <main className="connection-screen"><div className="brand-mark"><Crosshair size={24} /></div><h1>CS2 OPEN CASE BOT</h1><p>Open the Mini App through Telegram to continue.</p><div className="notice error">{authError ?? "Could not establish a player session. Check that the backend is running."}</div></main>;
   }
 
   return (
