@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: cs2bot
+      POSTGRES_USER: cs2
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cs2-local-only}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cs2 -d cs2bot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://cs2:${POSTGRES_PASSWORD:-cs2-local-only}@db:5432/cs2bot
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:8080}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "backend/bot.py"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://cs2:${POSTGRES_PASSWORD:-cs2-local-only}@db:5432/cs2bot
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["telegram"]
+
+volumes:
+  postgres_data:
